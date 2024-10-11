@@ -1,7 +1,9 @@
+// Define constants for the game grid size
 const ROWS = 20;
 const COLS = 12;
 const BLOCK_SIZE = 20;
 
+// Get DOM elements for the game canvas and sounds
 const canvas = document.getElementById('tetris');
 const context = canvas.getContext('2d');
 const lineClearSound = document.getElementById('line-clear-sound');
@@ -10,63 +12,92 @@ const backgroundMusic = document.getElementById('background-music');
 const pauseMenu = document.getElementById('pause-menu');
 const overlay = document.getElementById('overlay');
 
+// Define the shapes (tetrominoes) and their colors
 const SHAPES = [
-    [[1, 1, 1, 1]],
-    [[1, 1], [1, 1]],
-    [[1, 1, 1], [0, 1, 0]],
-    [[1, 1, 1], [1, 0, 0]],
-    [[1, 1, 1], [0, 0, 1]],
-    [[1, 1, 0], [0, 1, 1]],
-    [[0, 1, 1], [1, 1, 0]],
-    [[1, 1, 1, 1, 1]] // Pentomino shape
+    [[1, 1, 1, 1]],            // I shape
+    [[1, 1], [1, 1]],           // O shape
+    [[1, 1, 1], [0, 1, 0]],     // T shape
+    [[1, 1, 1], [1, 0, 0]],     // L shape
+    [[1, 1, 1], [0, 0, 1]],     // J shape
+    [[1, 1, 0], [0, 1, 1]],     // Z shape
+    [[0, 1, 1], [1, 1, 0]],     // S shape
+    [[1, 1, 1, 1, 1]]           // Pentomino shape
 ];
 
 const COLORS = [
     '#00FFFF', '#FFFF00', '#800080', '#FF0000', '#0000FF', '#00FF00', '#FFA500', '#FF00FF'
 ];
 
-let board = createBoard();
+// Initialize the game variables
+let board = createBoard(); // Create an empty board
 let score = 0;
 let level = 1;
 let linesClearedTotal = 0;
-let highScore = localStorage.getItem('highScore') || 0;
-document.getElementById('high-score').textContent = `High Score: ${highScore}`;
+let highScore = localStorage.getItem('highScore') || 0; // Retrieve high score from local storage
+document.getElementById('high-score').textContent = `High Score: ${highScore}`; // Display the high score
 
+// Variables for game timing and state
 let dropCounter = 0;
 let dropInterval = 1000;
 let lastTime = 0;
-let currentPiece;
-let nextPiece = createPiece();
+let currentPiece; // The currently active tetromino
+let nextPiece = createPiece(); // The next tetromino to display
 let gameLoop;
 let isPaused = false;
 let gameStartTime;
-let gameMode = 'normal'; // Could be 'normal', 'marathon', or 'time-attack'
+let gameMode = 'normal'; // Can be 'normal', 'marathon', or 'time-attack'
+let marathonTimeLimit = 600; // Marathon time limit in seconds (10 minutes)
 
+// Function to format time in MM:SS format
+function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+// Update the countdown timer during Marathon mode
+function updateMarathonTimer() {
+    const timePlayed = Math.floor((Date.now() - gameStartTime) / 1000);
+    const timeLeft = marathonTimeLimit - timePlayed;
+    
+    // If time is up, end the game
+    if (timeLeft <= 0) {
+        gameOver();
+        return;
+    }
+
+    // Update the timer display
+    document.getElementById('timer').textContent = `Time Left: ${formatTime(timeLeft)}`;
+}
+
+// Variables for touch gestures
 let touchStartX = 0;
 let touchStartY = 0;
 let touchEndX = 0;
 let touchEndY = 0;
 
-// Detect touch start
+// Pause button (initially hidden)
+const pauseButton = document.getElementById('pause-button');
+pauseButton.style.display = 'none'; // Hide pause button at the beginning
+
+// Touch event listeners for mobile controls
 canvas.addEventListener('touchstart', event => {
     touchStartX = event.touches[0].clientX;
     touchStartY = event.touches[0].clientY;
 });
 
-// Detect touch move
 canvas.addEventListener('touchmove', event => {
     touchEndX = event.touches[0].clientX;
     touchEndY = event.touches[0].clientY;
 });
 
-// Detect touch end to determine gesture direction
+// Detect touch end to determine gesture direction (swipes)
 canvas.addEventListener('touchend', () => {
     const deltaX = touchEndX - touchStartX;
     const deltaY = touchEndY - touchStartY;
 
-    // Swipe direction detection
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-        // Horizontal swipe
+        // Horizontal swipe detection
         if (deltaX > 30 && !collision(currentPiece.x + 1, currentPiece.y, currentPiece)) {
             // Swipe right
             currentPiece.x++;
@@ -75,32 +106,34 @@ canvas.addEventListener('touchend', () => {
             currentPiece.x--;
         }
     } else if (Math.abs(deltaY) > Math.abs(deltaX)) {
-        // Vertical swipe
+        // Vertical swipe detection
         if (deltaY > 30 && !collision(currentPiece.x, currentPiece.y + 1, currentPiece)) {
-            // Swipe down for a faster drop
+            // Swipe down (faster drop)
             currentPiece.y++;
         }
     } else {
-        // Tap for rotation if no significant swipe
+        // Tap to rotate the piece
         rotate(currentPiece);
     }
 
-    // Redraw the board after any touch gesture
+    // Redraw the board and pieces after the gesture
     context.clearRect(0, 0, canvas.width, canvas.height);
     drawBoard();
     drawGhostPiece();
     drawPiece();
 });
 
-// Prevent touch scrolling
+// Prevent touch scrolling on mobile devices
 canvas.addEventListener('touchmove', event => {
     event.preventDefault();
 }, { passive: false });
 
+// Create the game board (matrix of zeros)
 function createBoard() {
     return Array.from({ length: ROWS }, () => Array(COLS).fill(0));
 }
 
+// Draw the board by filling the cells based on their values
 function drawBoard() {
     board.forEach((row, y) => {
         row.forEach((value, x) => {
@@ -114,6 +147,7 @@ function drawBoard() {
     });
 }
 
+// Draw the current piece on the canvas
 function drawPiece() {
     currentPiece.shape.forEach((row, y) => {
         row.forEach((value, x) => {
@@ -127,6 +161,7 @@ function drawPiece() {
     });
 }
 
+// Draw the "ghost" piece (showing where it would land)
 function drawGhostPiece() {
     let ghostY = currentPiece.y;
     while (!collision(currentPiece.x, ghostY + 1, currentPiece)) {
@@ -144,6 +179,7 @@ function drawGhostPiece() {
     });
 }
 
+// Draw the next piece in the small preview canvas
 function drawNextPiece() {
     const nextContext = document.getElementById('next').getContext('2d');
     nextContext.clearRect(0, 0, nextContext.canvas.width, nextContext.canvas.height);
@@ -159,6 +195,7 @@ function drawNextPiece() {
     });
 }
 
+// Create a new piece (randomly chosen from SHAPES)
 function createPiece() {
     const shapeIndex = Math.floor(Math.random() * SHAPES.length);
     return {
@@ -169,6 +206,7 @@ function createPiece() {
     };
 }
 
+// Check if a piece will collide with another piece or the edge of the board
 function collision(x, y, piece) {
     return piece.shape.some((row, dy) => {
         return row.some((value, dx) => {
@@ -180,6 +218,7 @@ function collision(x, y, piece) {
     });
 }
 
+// Merge the current piece into the board (when it lands)
 function merge() {
     currentPiece.shape.forEach((row, y) => {
         row.forEach((value, x) => {
@@ -190,6 +229,7 @@ function merge() {
     });
 }
 
+// Rotate the current piece
 function rotate(piece) {
     const rotated = piece.shape[0].map((_, i) =>
         piece.shape.map(row => row[i]).reverse()
@@ -199,6 +239,7 @@ function rotate(piece) {
     }
 }
 
+// Animate the line being cleared from the board
 function animateLineClear(y) {
     context.clearRect(0, y * BLOCK_SIZE, canvas.width, BLOCK_SIZE);
     setTimeout(() => {
@@ -207,6 +248,7 @@ function animateLineClear(y) {
     }, 200);
 }
 
+// Check and clear lines that are fully filled
 function clearLines() {
     let linesCleared = 0;
     outer: for (let y = ROWS - 1; y >= 0; y--) {
@@ -226,12 +268,13 @@ function clearLines() {
 
         if (linesClearedTotal >= 10 * level) {
             level++;
-            dropInterval *= 0.9;
+            dropInterval *= 0.9; // Increase the game speed
             document.getElementById('level').textContent = `Level: ${level}`;
         }
     }
 }
 
+// End the game and show the game over screen
 function gameOver() {
     cancelAnimationFrame(gameLoop);
     context.fillStyle = 'rgba(0, 0, 0, 0.5)';
@@ -240,6 +283,9 @@ function gameOver() {
     context.font = '30px Arial';
     context.textAlign = 'center';
     context.fillText('Game Over', canvas.width / 2, canvas.height / 2);
+
+    // Hide pause button when the game ends
+    pauseButton.style.display = 'none';
 
     document.getElementById('start-button').style.display = 'block';
     document.getElementById('marathon-button').style.display = 'block';
@@ -254,18 +300,23 @@ function gameOver() {
     backgroundMusic.pause();
 }
 
+// Countdown timer for Time Attack mode
 function timeAttackCountdown() {
     const timeLeft = 300 - Math.floor((Date.now() - gameStartTime) / 1000);
     if (timeLeft <= 0) {
         gameOver();
+    } else {
+        document.getElementById('timer').textContent = `Time Left: ${formatTime(timeLeft)}`;
     }
 }
 
+// Adjust speed over time in Marathon mode
 function adjustSpeedBasedOnTime() {
     const timePlayed = Date.now() - gameStartTime;
     dropInterval = Math.max(100, 1000 - (timePlayed / 60000) * 200);
 }
 
+// Main game update loop
 function update(time = 0) {
     if (isPaused) return;
     const deltaTime = time - lastTime;
@@ -296,11 +347,13 @@ function update(time = 0) {
         timeAttackCountdown();
     } else if (gameMode === 'marathon') {
         adjustSpeedBasedOnTime();
+        updateMarathonTimer(); // Update the timer for Marathon mode
     }
 
     gameLoop = requestAnimationFrame(update);
 }
 
+// Start the game, initialize variables, and show the pause button
 function startGame(mode = 'normal') {
     board = createBoard();
     score = 0;
@@ -312,42 +365,50 @@ function startGame(mode = 'normal') {
     currentPiece = nextPiece;
     nextPiece = createPiece();
     drawNextPiece();
+
+    pauseButton.style.display = 'block'; // Show the pause button when the game starts
+
     document.getElementById('start-button').style.display = 'none';
     document.getElementById('marathon-button').style.display = 'none';
     document.getElementById('time-attack-button').style.display = 'none';
+    document.getElementById('timer').textContent = ''; // Clear the timer display
     lastTime = 0;
     dropCounter = 0;
     gameStartTime = Date.now();
     gameMode = mode;
+    if (gameMode === 'time-attack') {
+        document.getElementById('timer').textContent = 'Time Left: 05:00';
+    } else {
+        document.getElementById('timer').textContent = '';
+    }
     backgroundMusic.play();
     update();
 }
 
-// Event Listener for Keyboard Controls
+// Event listener for keyboard controls (arrows)
 document.addEventListener('keydown', event => {
-    if (isPaused) return;  // Do not allow movement while paused
+    if (isPaused) return;  // Do not allow movement when paused
     if (event.key === 'ArrowLeft' && !collision(currentPiece.x - 1, currentPiece.y, currentPiece)) {
-        // Move piece to the left
+        // Move left
         currentPiece.x--;
     } else if (event.key === 'ArrowRight' && !collision(currentPiece.x + 1, currentPiece.y, currentPiece)) {
-        // Move piece to the right
+        // Move right
         currentPiece.x++;
     } else if (event.key === 'ArrowDown' && !collision(currentPiece.x, currentPiece.y + 1, currentPiece)) {
-        // Move piece down faster
+        // Move down faster
         currentPiece.y++;
     } else if (event.key === 'ArrowUp') {
         // Rotate the piece
         rotate(currentPiece);
     }
 
-    // Redraw the board after any movement
     context.clearRect(0, 0, canvas.width, canvas.height);
     drawBoard();
     drawGhostPiece();
     drawPiece();
 });
 
-// Pause Menu Logic
+// Pause menu logic
 document.getElementById('resume-button').addEventListener('click', () => {
     pauseMenu.style.display = 'none';
     overlay.style.display = 'none';
@@ -355,11 +416,12 @@ document.getElementById('resume-button').addEventListener('click', () => {
     update();
 });
 
+// Exit the game from pause menu
 document.getElementById('exit-button').addEventListener('click', () => {
     pauseMenu.style.display = 'none';
     overlay.style.display = 'none';
     isPaused = false;
-    gameOver();  // End the current game and show game over screen
+    gameOver();  
 });
 
 // Toggle pause with 'P' key
@@ -377,8 +439,7 @@ document.addEventListener('keydown', event => {
     }
 });
 
-const pauseButton = document.getElementById('pause-button');
-
+// Pause button for mobile devices
 pauseButton.addEventListener('click', () => {
     isPaused = !isPaused;
     if (isPaused) {
@@ -391,7 +452,7 @@ pauseButton.addEventListener('click', () => {
     }
 });
 
+// Event listeners for game mode buttons
 document.getElementById('start-button').addEventListener('click', () => startGame('normal'));
 document.getElementById('marathon-button').addEventListener('click', () => startGame('marathon'));
 document.getElementById('time-attack-button').addEventListener('click', () => startGame('time-attack'));
-

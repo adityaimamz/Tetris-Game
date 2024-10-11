@@ -95,6 +95,13 @@ canvas {
     display: none;
 }
 
+#timer {
+    font-size: 18px;
+    margin-top: 10px;
+    color: #333;
+}
+
+
 @media (max-width: 768px) {
     #pause-button {
         display: block;
