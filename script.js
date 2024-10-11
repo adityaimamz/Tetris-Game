@@ -377,6 +377,20 @@ document.addEventListener('keydown', event => {
     }
 });
 
+const pauseButton = document.getElementById('pause-button');
+
+pauseButton.addEventListener('click', () => {
+    isPaused = !isPaused;
+    if (isPaused) {
+        pauseMenu.style.display = 'block';
+        overlay.style.display = 'block';
+    } else {
+        pauseMenu.style.display = 'none';
+        overlay.style.display = 'none';
+        update();
+    }
+});
+
 document.getElementById('start-button').addEventListener('click', () => startGame('normal'));
 document.getElementById('marathon-button').addEventListener('click', () => startGame('marathon'));
 document.getElementById('time-attack-button').addEventListener('click', () => startGame('time-attack'));

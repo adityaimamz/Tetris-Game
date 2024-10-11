@@ -90,3 +90,18 @@ canvas {
     z-index: 99;
     display: none;
 }
+
+#pause-button {
+    display: none;
+}
+
+@media (max-width: 768px) {
+    #pause-button {
+        display: block;
+        font-size: 16px;
+        margin-top: 10px;
+        padding: 8px 16px;
+        cursor: pointer;
+        width: 100%;
+    }
+}
