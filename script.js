@@ -277,6 +277,8 @@ function clearLines() {
 // End the game and show the game over screen
 function gameOver() {
     cancelAnimationFrame(gameLoop);
+    gameLoop = null; // Pastikan gameLoop di-reset
+
     context.fillStyle = 'rgba(0, 0, 0, 0.5)';
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.fillStyle = '#fff';
@@ -284,7 +286,6 @@ function gameOver() {
     context.textAlign = 'center';
     context.fillText('Game Over', canvas.width / 2, canvas.height / 2);
 
-    // Hide pause button when the game ends
     pauseButton.style.display = 'none';
 
     document.getElementById('start-button').style.display = 'block';
@@ -299,14 +300,16 @@ function gameOver() {
     gameOverSound.play();
     backgroundMusic.pause();
 }
-
 // Countdown timer for Time Attack mode
 function timeAttackCountdown() {
     const timeLeft = 300 - Math.floor((Date.now() - gameStartTime) / 1000);
     if (timeLeft <= 0) {
+        document.getElementById('timer').textContent = 'Time Left: 00:00';
         gameOver();
+        return true; // Menandakan bahwa waktu telah habis
     } else {
         document.getElementById('timer').textContent = `Time Left: ${formatTime(timeLeft)}`;
+        return false; // Menandakan bahwa waktu masih tersisa
     }
 }
 
@@ -319,8 +322,19 @@ function adjustSpeedBasedOnTime() {
 // Main game update loop
 function update(time = 0) {
     if (isPaused) return;
+
     const deltaTime = time - lastTime;
     lastTime = time;
+
+    if (gameMode === 'time-attack') {
+        if (timeAttackCountdown()) {
+            return; // Hentikan update jika waktu telah habis
+        }
+    } else if (gameMode === 'marathon') {
+        adjustSpeedBasedOnTime();
+        updateMarathonTimer();
+    }
+
     dropCounter += deltaTime;
     if (dropCounter > dropInterval) {
         if (!collision(currentPiece.x, currentPiece.y + 1, currentPiece)) {
@@ -338,17 +352,11 @@ function update(time = 0) {
         }
         dropCounter = 0;
     }
+
     context.clearRect(0, 0, canvas.width, canvas.height);
     drawBoard();
     drawGhostPiece();
     drawPiece();
-
-    if (gameMode === 'time-attack') {
-        timeAttackCountdown();
-    } else if (gameMode === 'marathon') {
-        adjustSpeedBasedOnTime();
-        updateMarathonTimer(); // Update the timer for Marathon mode
-    }
 
     gameLoop = requestAnimationFrame(update);
 }
